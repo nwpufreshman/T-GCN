@@ -17,6 +17,11 @@ DATA_PATHS = {
 
 
 def get_model(args, dm):
+    """
+    模型选择函数
+    根据命令行参数中的 model_name,返回相应的模型实例(GCN、GRU 或 TGCN),
+    并传入相应的参数(例如邻接矩阵、输入维度、隐藏层维度)
+    """
     model = None
     if args.model_name == "GCN":
         model = models.GCN(adj=dm.adj, input_dim=args.seq_len, output_dim=args.hidden_dim)
@@ -26,8 +31,12 @@ def get_model(args, dm):
         model = models.TGCN(adj=dm.adj, hidden_dim=args.hidden_dim)
     return model
 
-
 def get_task(args, model, dm):
+    """
+    任务选择函数
+    该函数根据 settings 参数，动态获取任务类(例如 "SupervisedForecastTask")，
+    并初始化任务实例，将模型、特征最大值和其他参数传递给任务。
+    """    
     task = getattr(tasks, args.settings.capitalize() + "ForecastTask")(
         model=model, feat_max_val=dm.feat_max_val, **vars(args)
     )
@@ -35,6 +44,11 @@ def get_task(args, model, dm):
 
 
 def get_callbacks(args):
+    """
+    回调函数
+    初始化了两个回调函数：一个是用于保存训练过程中模型的 ModelCheckpoint,
+    另一个是用于在验证过程中绘制预测结果的自定义回调 PlotValidationPredictionsCallback。
+    """
     checkpoint_callback = pl.callbacks.ModelCheckpoint(monitor="train_loss")
     plot_validation_predictions_callback = utils.callbacks.PlotValidationPredictionsCallback(monitor="train_loss")
     callbacks = [
@@ -45,6 +59,12 @@ def get_callbacks(args):
 
 
 def main_supervised(args):
+    """
+    监督学习主函数
+    该函数是代码的核心训练逻辑。首先，它通过 SpatioTemporalCSVDataModule 加载时空数据，
+    然后获取模型、任务和回调函数，并初始化一个 PyTorch Lightning 的 Trainer 实例。
+    训练通过 trainer.fit() 执行，训练完成后通过 trainer.validate() 进行验证，并返回结果。
+    """
     dm = utils.data.SpatioTemporalCSVDataModule(
         feat_path=DATA_PATHS[args.data]["feat"], adj_path=DATA_PATHS[args.data]["adj"], **vars(args)
     )
@@ -64,9 +84,10 @@ def main(args):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser = pl.Trainer.add_argparse_args(parser)
+    parser = argparse.ArgumentParser() # 使用 argparse 库创建一个新的命令行参数解析器对象 parser。
+    parser = pl.Trainer.add_argparse_args(parser) # 将 PyTorch Lightning 的 Trainer 类中预定义的参数添加到我们刚刚创建的parser对象中
 
+    # 调用 parser.add_argument() 来向解析器添加命令行参数。
     parser.add_argument(
         "--data", type=str, help="The name of the dataset", choices=("shenzhen", "losloop"), default="losloop"
     )
@@ -87,12 +108,13 @@ if __name__ == "__main__":
     parser.add_argument("--log_path", type=str, default=None, help="Path to the output console log file")
     parser.add_argument("--send_email", "--email", action="store_true", help="Send email when finished")
 
-    temp_args, _ = parser.parse_known_args()
+    temp_args, _ = parser.parse_known_args() # 用于解析已知的命令行参数并忽略未知的参数。
 
     parser = getattr(utils.data, temp_args.settings.capitalize() + "DataModule").add_data_specific_arguments(parser)
     parser = getattr(models, temp_args.model_name).add_model_specific_arguments(parser)
     parser = getattr(tasks, temp_args.settings.capitalize() + "ForecastTask").add_task_specific_arguments(parser)
 
+    # 这行代码执行最终的参数解析。此时，所有通过动态添加的参数都会被解析。
     args = parser.parse_args()
     utils.logging.format_logger(pl._logger)
     if args.log_path is not None:
@@ -102,12 +124,12 @@ if __name__ == "__main__":
         results = main(args)
     except:  # noqa: E722
         traceback.print_exc()
-        if args.send_email:
-            tb = traceback.format_exc()
-            subject = "[Email Bot][❌] " + "-".join([args.settings, args.model_name, args.data])
-            utils.email.send_email(tb, subject)
+        # if args.send_email:
+        #     tb = traceback.format_exc()
+        #     subject = "[Email Bot][❌] " + "-".join([args.settings, args.model_name, args.data])
+        #     utils.email.send_email(tb, subject)
         exit(-1)
 
-    if args.send_email:
-        subject = "[Email Bot][✅] " + "-".join([args.settings, args.model_name, args.data])
-        utils.email.send_experiment_results_email(args, results, subject=subject)
+    # if args.send_email:
+    #     subject = "[Email Bot][✅] " + "-".join([args.settings, args.model_name, args.data])
+    #     utils.email.send_experiment_results_email(args, results, subject=subject)
