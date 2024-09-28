@@ -96,7 +96,7 @@ if __name__ == "__main__":
         type=str,
         help="The name of the model for spatiotemporal prediction",
         choices=("GCN", "GRU", "TGCN"),
-        default="GCN",
+        default="TGCN",
     )
     parser.add_argument(
         "--settings",
@@ -113,6 +113,7 @@ if __name__ == "__main__":
     parser = getattr(utils.data, temp_args.settings.capitalize() + "DataModule").add_data_specific_arguments(parser)
     parser = getattr(models, temp_args.model_name).add_model_specific_arguments(parser)
     parser = getattr(tasks, temp_args.settings.capitalize() + "ForecastTask").add_task_specific_arguments(parser)
+    parser.max_epochs = 100 
 
     # 这行代码执行最终的参数解析。此时，所有通过动态添加的参数都会被解析。
     args = parser.parse_args()
